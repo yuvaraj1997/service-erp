@@ -4,6 +4,7 @@ import com.yukadeeca.service_erp.common.constant.RoleConstants;
 import com.yukadeeca.service_erp.common.service.email.IEmailService;
 import com.yukadeeca.service_erp.user.dto.UserCreateRequest;
 import com.yukadeeca.service_erp.user.entity.User;
+import com.yukadeeca.service_erp.user.service.UserManagementService;
 import com.yukadeeca.service_erp.user.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,7 @@ public class DataInitializer {
 
     @Bean
     @Transactional
-    public ApplicationRunner initSystemUsers(UserService userService, IEmailService emailService) {
+    public ApplicationRunner initSystemUsers(UserService userService, UserManagementService userManagementService, IEmailService emailService) {
         return args -> {
 
             User user = userService.findByEmail(superAdminEmail);
@@ -35,7 +36,7 @@ public class DataInitializer {
                 userCreateRequest.setFirstName("Admin");
                 userCreateRequest.setLastName("User");
 
-                User adminUser = userService.createUserWithVerification(userCreateRequest, RoleConstants.SUPER_ADMIN);
+                User adminUser = userManagementService.createUserWithVerification(userCreateRequest, RoleConstants.SUPER_ADMIN);
 
                 log.info("Admin user is successfully create id={} , email={}", adminUser.getId(), superAdminEmail);
             }
