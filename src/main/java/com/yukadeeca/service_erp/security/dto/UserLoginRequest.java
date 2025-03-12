@@ -1,4 +1,4 @@
-package com.yukadeeca.service_erp.user.dto;
+package com.yukadeeca.service_erp.security.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

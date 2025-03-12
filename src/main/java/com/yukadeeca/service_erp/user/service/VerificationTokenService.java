@@ -37,8 +37,8 @@ public class VerificationTokenService {
         String type = VerificationTokenConstants.TYPE_EMAIL_VERIFICATION;
 
         verificationTokenRepository.updateTokenStatus(user, type,
-                                                            VerificationTokenConstants.STATUS_PENDING,
-                                                            VerificationTokenConstants.STATUS_REVOKED);
+                VerificationTokenConstants.STATUS_PENDING,
+                VerificationTokenConstants.STATUS_REVOKED);
 
         VerificationToken verificationToken = new VerificationToken();
         verificationToken.setToken(UUID.randomUUID().toString());

@@ -85,17 +85,17 @@ public class JwtUtil {
         }
 
         String token = Jwts.builder()
-                            .header()
-                            .type(tokenType.getType())
-                            .and()
-                            .issuer(JwtConstants.ISSUER)
-                            .issuedAt(toDate(now))
-                            .expiration(toDate(expiration))
-                            .subject(subject)
-                            .id(jti)
-                            .claims(claims)
-                            .signWith(privateKey)
-                            .compact();
+                .header()
+                .type(tokenType.getType())
+                .and()
+                .issuer(JwtConstants.ISSUER)
+                .issuedAt(toDate(now))
+                .expiration(toDate(expiration))
+                .subject(subject)
+                .id(jti)
+                .claims(claims)
+                .signWith(privateKey)
+                .compact();
 
 
         return new TokenResult(token, jti, now, expiration, tokenType);
@@ -104,6 +104,7 @@ public class JwtUtil {
     public Jws<Claims> getJws(String token) throws JwtException {
         return Jwts.parser()
                 .verifyWith(publicKey)
+                .clockSkewSeconds(Long.MAX_VALUE / 1000)
                 .build()
                 .parseSignedClaims(token);
     }

@@ -1,7 +1,9 @@
 package com.yukadeeca.service_erp.security;
 
+import com.yukadeeca.service_erp.security.filter.CustomAuthenticationFilter;
 import com.yukadeeca.service_erp.security.filter.JwtFilter;
 import com.yukadeeca.service_erp.user.service.auth.CustomUserDetailsService;
+import com.yukadeeca.service_erp.user.service.auth.UserAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,36 +23,33 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 //@EnableMethodSecurity
-public class SecurityConfig  {
+public class SecurityConfig {
 
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
     @Autowired
+    private UserAuthService userAuthService;
+
+    @Autowired
     private JwtFilter jwtFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+
+        CustomAuthenticationFilter customAuthenticationFilter = new CustomAuthenticationFilter(authenticationManager, userAuthService);
+        customAuthenticationFilter.setFilterProcessesUrl("/login");
 
         http.csrf(AbstractHttpConfigurer::disable)
-            .formLogin(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(request -> request
-                    .requestMatchers("/auth/login")
-                    .permitAll()
-                    .anyRequest().authenticated())
-            .sessionManagement(session ->
-                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .addFilterAfter(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-//        http
-//                .formLogin(AbstractHttpConfigurer::disable) // Disable form login
-//                .csrf(AbstractHttpConfigurer::disable) // Disable CSRF (if not needed)
-//                .sessionManagement(httpSecuritySessionManagementConfigurer -> {
-//                    return httpSecuritySessionManagementConfigurer.addSessionAuthenticationStrategy(SessionCreationPolicy.STATELESS)[]
-//                })
-//                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll()) // Allow all requests
-//                .httpBasic(AbstractHttpConfigurer::disable); // Disable basic authentication
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(request -> request
+                        .anyRequest().authenticated())
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .addFilter(customAuthenticationFilter)
+                .addFilterAfter(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

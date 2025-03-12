@@ -36,9 +36,9 @@ public class AuthorizationToken implements UserDetails {
     }
 
     public List<String> getUserRoles() {
-       return claims.containsKey(JwtConstants.CLAIMS_ROLES)
-               ? (List<String>) claims.get(JwtConstants.CLAIMS_ROLES)
-               : new ArrayList<>();
+        return claims.containsKey(JwtConstants.CLAIMS_ROLES)
+                ? (List<String>) claims.get(JwtConstants.CLAIMS_ROLES)
+                : new ArrayList<>();
     }
 
     @Override
@@ -47,7 +47,7 @@ public class AuthorizationToken implements UserDetails {
 
         List<GrantedAuthority> authorities = new ArrayList<>();
 
-        for(String role : userRoles) {
+        for (String role : userRoles) {
             authorities.add(new SimpleGrantedAuthority(role));
         }
 
