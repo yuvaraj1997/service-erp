@@ -1,5 +1,6 @@
 package com.yukadeeca.service_erp.user.controller;
 
+import com.yukadeeca.service_erp.common.constant.RoleConstants;
 import com.yukadeeca.service_erp.user.dto.UserCreateRequest;
 import com.yukadeeca.service_erp.user.dto.UserSetPasswordRequest;
 import com.yukadeeca.service_erp.user.entity.User;
@@ -8,10 +9,12 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("users")
+@Secured(RoleConstants.SUPER_ADMIN)
 public class UserController {
 
     @Autowired
