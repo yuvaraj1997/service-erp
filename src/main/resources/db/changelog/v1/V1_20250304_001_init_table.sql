@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS main.user_sessions (
     id SERIAL   PRIMARY KEY,
     user_id     INTEGER NOT NULL,                   -- Links to users table
     session_id  VARCHAR(255) UNIQUE NOT NULL,       -- Session Id
-    is_active   BOOLEAN NOT NULL DEFAULT TRUE,     -- Session active flag
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,      -- Session active flag
     expiry_date TIMESTAMP NOT NULL,                 -- Session expiration
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -69,3 +69,22 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON main.user_sessions(user_
 
 -- Add index for session_id to speed up lookups (already UNIQUE, but an explicit index helps)
 CREATE INDEX IF NOT EXISTS idx_user_sessions_session_id ON main.user_sessions(session_id);
+
+-- User Otp Verification Table
+CREATE TABLE IF NOT EXISTS main.user_otp_verifications (
+    id             SERIAL PRIMARY KEY,
+    user_id        INTEGER NOT NULL,                                       -- Links to users table
+    otp            TEXT NOT NULL,                                          -- Store OTP (hashed)
+    otp_type       TEXT CHECK (otp_type IN ('LOGIN', 'RESET_PASSWORD')),   -- Purpose of OTP
+    is_active      BOOLEAN NOT NULL DEFAULT TRUE,                          -- Active flag
+    used_at        TIMESTAMP,                                              -- When the OTP is used
+    user_agent     TEXT,                                                   -- Track device user agent
+    ip_address     TEXT,                                                   -- Track IP address
+    attempts       INTEGER DEFAULT 0,                                      -- Number of failed attempts
+    expiry_date    TIMESTAMP NOT NULL,                                     -- OTP expiration
+    resend_count   INTEGER DEFAULT 0,                                      -- Number of times OTP has been resent
+    last_resend_at TIMESTAMP NOT NULL,                                     -- Last resend timestamp
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    FOREIGN KEY (user_id) REFERENCES main.users(id) ON DELETE CASCADE
+);

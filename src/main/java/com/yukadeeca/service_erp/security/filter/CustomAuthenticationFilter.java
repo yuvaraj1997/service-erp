@@ -1,6 +1,9 @@
 package com.yukadeeca.service_erp.security.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yukadeeca.service_erp.common.constant.ErrorCode;
+import com.yukadeeca.service_erp.common.exception.ApplicationException;
+import com.yukadeeca.service_erp.common.exception.ErrorResponse;
 import com.yukadeeca.service_erp.security.dto.TokenResult;
 import com.yukadeeca.service_erp.security.dto.UserLoginRequest;
 import com.yukadeeca.service_erp.user.service.auth.UserAuthService;
@@ -57,6 +60,20 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException, ServletException {
         try {
             User user = (User) authResult.getPrincipal();
+
+            if (userAuthService.isMfaRequired(user.getUsername(), request)) {
+
+                userAuthService.sendOtpVerification(user.getUsername(), request);
+
+                response.setContentType(APPLICATION_JSON_VALUE);
+                response.setStatus(HttpServletResponse.SC_OK);
+
+                Map<String, Object> result = new HashMap<>();
+                result.put("successMessage", "Need otp verification");
+                objectMapper.writeValue(response.getOutputStream(), result);
+                return;
+            }
+
             TokenResult tokenResult = userAuthService.generateRefreshToken(user.getUsername());
 
             Cookie refreshTokenCookie = new Cookie("token", tokenResult.getRefreshToken());
@@ -70,7 +87,7 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
             response.sendRedirect("http://localhost:3000");
         } catch (Exception ex) {
             log.error("[{}]: Unable to proceed with successful authentication errorMessage={}", ex.getClass().getSimpleName(), ex.getMessage());
-            throw new AuthenticationServiceException("Internal Server Error. Please contact support.");
+            throw new AuthenticationServiceException("Internal Server Error. Please contact support.", ex);
         }
     }
 
@@ -80,15 +97,20 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
 
         if (failed.getCause() instanceof BadCredentialsException) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            Map<String, Object> result = new HashMap<>();
-            result.put("errorMessage", "Invalid email or password");
-            objectMapper.writeValue(response.getOutputStream(), result);
+            ErrorResponse errorResponse = new ErrorResponse(ErrorCode.INVALID_CREDENTIALS, request.getRequestURI());
+            objectMapper.writeValue(response.getOutputStream(), errorResponse);
+            return;
+        }
+
+        if (failed.getCause() instanceof ApplicationException) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            ErrorResponse errorResponse = new ErrorResponse(((ApplicationException) failed.getCause()).getErrorCode(), request.getRequestURI());
+            objectMapper.writeValue(response.getOutputStream(), errorResponse);
             return;
         }
 
         response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        Map<String, Object> result = new HashMap<>();
-        result.put("errorMessage", "Internal Server Error. Please contact support.");
-        objectMapper.writeValue(response.getOutputStream(), result);
+        ErrorResponse errorResponse = new ErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR, request.getRequestURI());
+        objectMapper.writeValue(response.getOutputStream(), errorResponse);
     }
 }

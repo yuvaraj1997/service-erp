@@ -3,7 +3,7 @@ package com.yukadeeca.service_erp.user.service;
 
 import com.yukadeeca.service_erp.common.constant.EmailConstants;
 import com.yukadeeca.service_erp.common.constant.VerificationTokenConstants;
-import com.yukadeeca.service_erp.common.exception.VerificationTokenException;
+import com.yukadeeca.service_erp.common.exception.ApplicationException;
 import com.yukadeeca.service_erp.common.service.email.IEmailService;
 import com.yukadeeca.service_erp.user.entity.User;
 import com.yukadeeca.service_erp.user.entity.VerificationToken;
@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+
+import static com.yukadeeca.service_erp.common.constant.ErrorCode.VERIFICATION_TOKEN_ERROR;
 
 @Slf4j
 @Service
@@ -73,18 +75,18 @@ public class VerificationTokenService {
 
         if (null == verificationToken) {
             log.info("Token not found token={} , type={}", token, type);
-            throw new VerificationTokenException(errorMsg);
+            throw new ApplicationException(VERIFICATION_TOKEN_ERROR, errorMsg);
         }
 
         if (!Objects.equals(verificationToken.getStatus(), VerificationTokenConstants.STATUS_PENDING)) {
             log.info("Token is not in [{}] , token={} , status={}", VerificationTokenConstants.STATUS_PENDING, token, verificationToken.getStatus());
-            throw new VerificationTokenException(errorMsg);
+            throw new ApplicationException(VERIFICATION_TOKEN_ERROR, errorMsg);
         }
 
         if (LocalDateTime.now().isAfter(verificationToken.getExpiryDate())) {
             log.info("Token is expired , token={} , expiryDate={}", token, verificationToken.getExpiryDate().toString());
             verificationToken.setStatus(VerificationTokenConstants.STATUS_EXPIRED);
-            throw new VerificationTokenException(errorMsg);
+            throw new ApplicationException(VERIFICATION_TOKEN_ERROR, errorMsg);
         }
 
         verificationToken.setStatus(VerificationTokenConstants.STATUS_USED);

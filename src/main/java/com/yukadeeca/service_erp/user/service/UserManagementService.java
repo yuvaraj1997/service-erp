@@ -1,10 +1,11 @@
 package com.yukadeeca.service_erp.user.service;
 
 
+import com.yukadeeca.service_erp.common.constant.ErrorCode;
 import com.yukadeeca.service_erp.common.constant.RoleConstants;
 import com.yukadeeca.service_erp.common.constant.UserConstants;
 import com.yukadeeca.service_erp.common.constant.VerificationTokenConstants;
-import com.yukadeeca.service_erp.common.exception.InvalidArgumentException;
+import com.yukadeeca.service_erp.common.exception.ApplicationException;
 import com.yukadeeca.service_erp.user.dto.UserCreateRequest;
 import com.yukadeeca.service_erp.user.dto.UserSetPasswordRequest;
 import com.yukadeeca.service_erp.user.entity.User;
@@ -96,7 +97,7 @@ public class UserManagementService {
 
         if (!Objects.equals(user.getStatus(), UserConstants.STATUS_PENDING_SETUP)) {
             log.info("User status is invalid to set password userId={} , expected={} , currentStatus={}", user.getId(), UserConstants.STATUS_PENDING_SETUP, user.getStatus());
-            throw new InvalidArgumentException("Invalid request");
+            throw new ApplicationException(ErrorCode.INVALID_REQUEST);
         }
 
         user.setPassword(passwordEncoder.encode(userSetPasswordRequest.getPassword()));
