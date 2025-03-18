@@ -13,7 +13,6 @@ public final class UserOtpVerificationConstants {
     }
 
     public static final String TYPE_LOGIN = "LOGIN";
-    public static final String TYPE_RESET_PASSWORD = "RESET_PASSWORD";
 
     @AllArgsConstructor
     @Getter

@@ -1,8 +1,8 @@
 package com.yukadeeca.service_erp.user.service;
 
 
-import com.yukadeeca.service_erp.common.constant.EmailConstants;
 import com.yukadeeca.service_erp.common.constant.VerificationTokenConstants;
+import com.yukadeeca.service_erp.common.constant.emailTemplate.RegisterEmailOtpVerification;
 import com.yukadeeca.service_erp.common.exception.ApplicationException;
 import com.yukadeeca.service_erp.common.service.email.IEmailService;
 import com.yukadeeca.service_erp.user.entity.User;
@@ -15,8 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -36,32 +34,31 @@ public class VerificationTokenService {
     private String baseUrlUi;
 
     public void sendEmailVerificationEmail(User user) {
-        String type = VerificationTokenConstants.TYPE_EMAIL_VERIFICATION;
+        VerificationTokenConstants.Type type = VerificationTokenConstants.Type.REGISTER_EMAIL_VERIFICATION;
 
-        verificationTokenRepository.updateTokenStatus(user, type,
+        verificationTokenRepository.updateTokenStatus(user, type.getType(),
                 VerificationTokenConstants.STATUS_PENDING,
                 VerificationTokenConstants.STATUS_REVOKED);
 
         VerificationToken verificationToken = new VerificationToken();
         verificationToken.setToken(UUID.randomUUID().toString());
         verificationToken.setUser(user);
-        verificationToken.setType(type);
+        verificationToken.setType(type.getType());
 
-        Integer secondsToExpired = VerificationTokenConstants.verificationValidityInSeconds.get(type);
-
-        if (null == secondsToExpired) {
-            throw new RuntimeException(String.format("Unable to find seconds to expired for sending verification email, userId=%s , type=%s", user.getId(), type));
-        }
-
-        verificationToken.setExpiryDate(verificationToken.getCreatedAt().plusSeconds(secondsToExpired));
+        verificationToken.setExpiryDate(verificationToken.getCreatedAt().plusMinutes(type.getOtpValidityMinutes()));
 
         verificationTokenRepository.save(verificationToken);
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("name", user.getFirstName());
-        payload.put("verification_link", buildVerificationUrl(verificationToken.getToken()));
+        RegisterEmailOtpVerification builder = (RegisterEmailOtpVerification) type.getBuilder();
 
-        emailService.sendHtmlEmail(user.getEmail(), EmailConstants.EMAIL_VERIFICATION_SUBJECT, payload, EmailConstants.EMAIL_VERIFICATION_TEMPLATE);
+        emailService.sendHtmlEmail(
+                user.getEmail(),
+                builder.getSubject(),
+                builder.name(user.getFirstName())
+                       .verificationLink(buildVerificationUrl(verificationToken.getToken()))
+                       .build(),
+                builder.getTemplate()
+        );
     }
 
     String buildVerificationUrl(String token) {

@@ -1,7 +1,11 @@
 package com.yukadeeca.service_erp.common.constant;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.yukadeeca.service_erp.common.constant.emailTemplate.EmailTemplateBuilder;
+import com.yukadeeca.service_erp.common.constant.emailTemplate.RegisterEmailOtpVerification;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+import java.util.function.Supplier;
 
 public final class VerificationTokenConstants {
     private VerificationTokenConstants() {
@@ -16,11 +20,18 @@ public final class VerificationTokenConstants {
     public static final String STATUS_EXPIRED = "EXPIRED";
     public static final String STATUS_REVOKED = "REVOKED";
 
-    public static final Map<String, Integer> verificationValidityInSeconds = new HashMap<>();
+    @AllArgsConstructor
+    @Getter
+    public enum Type {
+        REGISTER_EMAIL_VERIFICATION(TYPE_EMAIL_VERIFICATION, 60 * 2, RegisterEmailOtpVerification::builder);
 
-    static {
-        verificationValidityInSeconds.put(TYPE_EMAIL_VERIFICATION, 60 * 60 * 2);
-        verificationValidityInSeconds.put(TYPE_PASSWORD_RESET, 60 * 60 * 2);
+        final String type;
+        final Integer otpValidityMinutes;
+        final Supplier<EmailTemplateBuilder> emailTemplate;
+
+        public EmailTemplateBuilder getBuilder() {
+            return emailTemplate.get();
+        }
     }
 
 }
