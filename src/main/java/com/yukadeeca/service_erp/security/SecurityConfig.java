@@ -2,6 +2,7 @@ package com.yukadeeca.service_erp.security;
 
 import com.yukadeeca.service_erp.security.filter.CustomAuthenticationFilter;
 import com.yukadeeca.service_erp.security.filter.JwtFilter;
+import com.yukadeeca.service_erp.security.filter.MFAAuthenticationFilter;
 import com.yukadeeca.service_erp.user.service.auth.CustomUserDetailsService;
 import com.yukadeeca.service_erp.user.service.auth.UserAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableWebSecurity
+@EnableWebSecurity(debug = true)
 @EnableMethodSecurity(securedEnabled = true)
 public class SecurityConfig {
 
@@ -38,8 +39,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
 
-        CustomAuthenticationFilter customAuthenticationFilter = new CustomAuthenticationFilter(authenticationManager, userAuthService);
+        CustomAuthenticationFilter customAuthenticationFilter = new CustomAuthenticationFilter(authenticationManager);
         customAuthenticationFilter.setFilterProcessesUrl("/login");
+
+        MFAAuthenticationFilter mfaAuthenticationFilter = new MFAAuthenticationFilter(userAuthService);
 
         http.csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -50,8 +53,9 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .addFilter(customAuthenticationFilter)
-                .addFilterAfter(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterAt(customAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(mfaAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(jwtFilter, MFAAuthenticationFilter.class);
 
         return http.build();
     }

@@ -1,4 +1,4 @@
-package com.yukadeeca.service_erp.common.exception;
+package com.yukadeeca.service_erp.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.yukadeeca.service_erp.common.constant.ErrorCode;
@@ -12,7 +12,7 @@ import static com.yukadeeca.service_erp.common.util.DateUtil.nowAsString;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
     private Integer status;
-    private String errorCode;
+    private String code;
     private String message;
     private String details;
     private Map<Object, Object> additionalProperties;
@@ -21,7 +21,7 @@ public class ErrorResponse {
 
     public ErrorResponse(ErrorCode errorCode, String details, Map<Object, Object> additionalProperties, String path) {
         this.status = errorCode.getStatus();
-        this.errorCode = errorCode.getCode();
+        this.code = errorCode.getCode();
         this.message = errorCode.getMessage();
         this.details = details;
         this.additionalProperties = additionalProperties;

@@ -1,9 +1,12 @@
 package com.yukadeeca.service_erp.user.controller;
 
+import com.yukadeeca.service_erp.common.constant.SuccessCode;
+import com.yukadeeca.service_erp.common.dto.SuccessResponse;
 import com.yukadeeca.service_erp.security.dto.AuthorizationToken;
 import com.yukadeeca.service_erp.security.dto.TokenResult;
-import com.yukadeeca.service_erp.user.dto.ResendOtpRequest;
-import com.yukadeeca.service_erp.user.dto.ValidateOtpRequest;
+import com.yukadeeca.service_erp.user.dto.otp.OtpRequestResponse;
+import com.yukadeeca.service_erp.user.dto.otp.ResendOtpRequest;
+import com.yukadeeca.service_erp.user.dto.otp.ValidateOtpRequest;
 import com.yukadeeca.service_erp.user.service.auth.UserAuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,9 +27,13 @@ public class AuthController {
     UserAuthService userAuthService;
 
     @PostMapping("/otp/resend")
-    public ResponseEntity<?> resendOtp(@Valid @RequestBody ResendOtpRequest resendOtpRequest, HttpServletRequest httpServletRequest) throws IOException {
-        userAuthService.resendOtpVerification(resendOtpRequest.getEmail(), httpServletRequest);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<SuccessResponse<OtpRequestResponse>> resendOtp(@Valid @RequestBody ResendOtpRequest resendOtpRequest, HttpServletRequest httpServletRequest) throws IOException {
+        OtpRequestResponse otpRequestResponse = userAuthService.resendOtpVerification(resendOtpRequest.getEmail(), httpServletRequest);
+
+        SuccessResponse<OtpRequestResponse> successResponse = new SuccessResponse<>(SuccessCode.OTP_REQUESTED);
+        successResponse.setData(otpRequestResponse);
+
+        return ResponseEntity.ok().body(successResponse);
     }
 
     @PostMapping("/otp/validate")

@@ -7,6 +7,7 @@ import com.yukadeeca.service_erp.common.util.DeviceInfoUtil;
 import com.yukadeeca.service_erp.security.dto.AuthorizationToken;
 import com.yukadeeca.service_erp.security.dto.TokenResult;
 import com.yukadeeca.service_erp.security.util.JwtUtil;
+import com.yukadeeca.service_erp.user.dto.otp.OtpRequestResponse;
 import com.yukadeeca.service_erp.user.entity.Role;
 import com.yukadeeca.service_erp.user.entity.User;
 import com.yukadeeca.service_erp.user.entity.UserOtpVerification;
@@ -80,27 +81,27 @@ public class UserAuthService {
         return userOtpVerification.getUsedAt().isBefore(nowDate().minusDays(2));
     }
 
-    public void sendOtpVerification(String email, HttpServletRequest request) {
+    public OtpRequestResponse sendOtpVerification(String email, HttpServletRequest request) {
         User user = userService.findByEmail(email);
 
         String ipAddress = DeviceInfoUtil.getClientIp(request);
         String userAgent = DeviceInfoUtil.getUserDevice(request);
 
-        userOtpVerificationService.sendLoginOtp(user, ipAddress, userAgent);
+        return userOtpVerificationService.sendLoginOtp(user, ipAddress, userAgent);
     }
 
-    public void resendOtpVerification(String email, HttpServletRequest request) {
+    public OtpRequestResponse resendOtpVerification(String email, HttpServletRequest request) {
         User user = userService.findByEmail(email);
 
         if (null == user) {
             log.info("User not found to send otp verification email={} , requestUri={}", email, request.getRequestURI());
-            return;
+            return null;
         }
 
         String ipAddress = DeviceInfoUtil.getClientIp(request);
         String userAgent = DeviceInfoUtil.getUserDevice(request);
 
-        userOtpVerificationService.resendLoginOtp(user, ipAddress, userAgent);
+        return userOtpVerificationService.resendLoginOtp(user, ipAddress, userAgent);
     }
 
     public void validateOtpVerification(String email, String otp, HttpServletRequest request) {

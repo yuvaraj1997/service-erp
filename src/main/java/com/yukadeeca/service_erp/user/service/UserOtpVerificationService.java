@@ -5,7 +5,8 @@ import com.yukadeeca.service_erp.common.constant.UserOtpVerificationConstants;
 import com.yukadeeca.service_erp.common.constant.emailTemplate.UserLoginOtpVerification;
 import com.yukadeeca.service_erp.common.exception.ApplicationException;
 import com.yukadeeca.service_erp.common.service.email.IEmailService;
-import com.yukadeeca.service_erp.user.dto.OtpRequestResult;
+import com.yukadeeca.service_erp.user.dto.otp.OtpRequestResponse;
+import com.yukadeeca.service_erp.user.dto.otp.OtpRequestResult;
 import com.yukadeeca.service_erp.user.entity.User;
 import com.yukadeeca.service_erp.user.entity.UserOtpVerification;
 import com.yukadeeca.service_erp.user.repository.UserOtpVerificationRepository;
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.token.Sha512DigestUtils;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static com.yukadeeca.service_erp.common.constant.ErrorCode.*;
@@ -47,105 +47,74 @@ public class UserOtpVerificationService {
         return findTopByUserIdAndIpAddressAndUserAgentAndOtpTypeAndUsedAtIsNotNullOrderByUsedAtDesc(user.getId(), ipAddress, userAgent, UserOtpVerificationConstants.TYPE_LOGIN);
     }
 
-    public void sendLoginOtp(User user, String ipAddress, String userAgent) {
-        UserOtpVerificationConstants.Type type = UserOtpVerificationConstants.Type.LOGIN;
-
-        OtpRequestResult otpRequestResult = sendOtp(user, ipAddress, userAgent, type);
-
-        if (StringUtils.isBlank(otpRequestResult.getOtp())) {
-            return;
-        }
-
-        UserLoginOtpVerification builder = (UserLoginOtpVerification) UserOtpVerificationConstants.Type.LOGIN.getBuilder();
-
-        emailService.sendHtmlEmail(
-                        user.getEmail(),
-                        builder.getSubject(),
-                        builder.name(user.getFirstName())
-                               .otpValidityInMinutes(type.getOtpValidityMinutes())
-                               .otpCode(otpRequestResult.getOtp())
-                               .build(),
-                        builder.getTemplate()
-                );
+    public OtpRequestResponse sendLoginOtp(User user, String ipAddress, String userAgent) {
+        return sendOtp(user, ipAddress, userAgent, UserOtpVerificationConstants.Type.LOGIN);
     }
 
-    public void resendLoginOtp(User user, String ipAddress, String userAgent) {
-        UserOtpVerificationConstants.Type type = UserOtpVerificationConstants.Type.LOGIN;
+    public OtpRequestResponse resendLoginOtp(User user, String ipAddress, String userAgent) {
+        return resendOtp(user, ipAddress, userAgent, UserOtpVerificationConstants.Type.LOGIN);
+    }
 
+    public void validateLoginOtp(User user, String otp, String ipAddress, String userAgent) {
+        validateOtp(user, otp, ipAddress, userAgent, UserOtpVerificationConstants.Type.LOGIN);
+    }
+
+    private void sendLoginOtpEmail(User user, String otp, UserOtpVerificationConstants.Type type) {
+        UserLoginOtpVerification builder = (UserLoginOtpVerification) type.getBuilder();
+
+        emailService.sendHtmlEmail(
+                user.getEmail(),
+                builder.getSubject(),
+                builder.name(user.getFirstName())
+                        .otpValidityInMinutes(type.getOtpValidityMinutes())
+                        .otpCode(otp)
+                        .build(),
+                builder.getTemplate()
+        );
+    }
+
+    private OtpRequestResponse sendOtp(User user, String ipAddress, String userAgent, UserOtpVerificationConstants.Type type) {
+        OtpRequestResult otpRequestResult = checkIfRequestedBefore(user, ipAddress, userAgent, type);
+
+        String otp = null;
+
+        if (!otpRequestResult.getNeedToSendNew()) {
+            otp = otpRequestResult.getOtp();
+        } else {
+            otp = generateOtp();
+
+            createNewOtp(user, ipAddress, userAgent, type, otp);
+
+            otpRequestResult.setOtp(otp);
+            otpRequestResult.setMaxRequestLimit(type.getMaxRequest());
+            otpRequestResult.setRemainingRequestCount(type.getMaxRequest());
+            otpRequestResult.setRetryAfterSeconds(type.getResendIntervalSeconds());
+        }
+
+        if (StringUtils.isNotBlank(otp)) {
+            sendOtpEmail(user, otp, type);
+        }
+
+        return buildOtpRequestResponse(otpRequestResult);
+    }
+
+    public OtpRequestResponse resendOtp(User user, String ipAddress, String userAgent, UserOtpVerificationConstants.Type type) {
         UserOtpVerification userOtpVerification = findTopByUserIdAndIpAddressAndUserAgentAndOtpTypeOrderByCreatedAtDesc(user.getId(), ipAddress, userAgent, type.getType());
 
-        if (userOtpVerification == null) {
-            log.info("Otp is not found userId={} , ipAddress={}, userAgent={}", user.getId(), ipAddress, userAgent);
-            throw new ApplicationException(INVALID_REQUEST);
-        }
+        basicValidation(user, userOtpVerification, ipAddress, userAgent);
 
-        boolean isActive = userOtpVerification.getIsActive();
-
-        if (!isActive) {
-            log.info("Otp is inactive userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
-            throw new ApplicationException(INVALID_REQUEST);
-        }
-
-        // Check if OTP is expired (Deactivate it)
-        if (isExpired(userOtpVerification.getExpiryDate())) {
-            log.info("Otp is expired userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
-            markAsExpired(userOtpVerification);
-            throw new ApplicationException(INVALID_REQUEST);
-        }
-
-        if (isOtpVerificationReachedMax(userOtpVerification.getResendCount())) {
+        if (isOtpVerificationReachedMax(type, userOtpVerification.getResendCount())) {
             log.info("Otp has reached max userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
             throw new ApplicationException(INVALID_REQUEST);
         }
 
-        checkIfRequestedBefore(user, ipAddress, userAgent, UserOtpVerificationConstants.Type.LOGIN);
-    }
+        OtpRequestResult otpRequestResult = checkIfRequestedBefore(user, ipAddress, userAgent, UserOtpVerificationConstants.Type.LOGIN);
 
-    public void validateLoginOtp(User user, String otp, String ipAddress, String userAgent) {
-        UserOtpVerificationConstants.Type type = UserOtpVerificationConstants.Type.LOGIN;
-
-        UserOtpVerification userOtpVerification = findTopByUserIdAndIpAddressAndUserAgentAndOtpTypeOrderByCreatedAtDesc(user.getId(), ipAddress, userAgent, type.getType());
-
-        if (userOtpVerification == null) {
-            log.info("Otp is not found userId={} , ipAddress={}, userAgent={}", user.getId(), ipAddress, userAgent);
-            throw new ApplicationException(INVALID_REQUEST);
+        if (StringUtils.isNotBlank(otpRequestResult.getOtp())) {
+            sendOtpEmail(user, otpRequestResult.getOtp(), type);
         }
 
-        boolean isActive = userOtpVerification.getIsActive();
-
-        if (!isActive) {
-            log.info("Otp is inactive userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
-            throw new ApplicationException(INVALID_REQUEST);
-        }
-
-        // Check if OTP is expired (Deactivate it)
-        if (isExpired(userOtpVerification.getExpiryDate())) {
-            log.info("Otp is expired userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
-            markAsExpired(userOtpVerification);
-            throw new ApplicationException(INVALID_REQUEST);
-        }
-
-        if (!sha512Hex(otp).equals(userOtpVerification.getOtp())) {
-            log.info("Invalid otp userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
-            throw new ApplicationException(INVALID_REQUEST);
-        }
-
-        markAsVerified(userOtpVerification);
-    }
-
-    private OtpRequestResult sendOtp(User user, String ipAddress, String userAgent, UserOtpVerificationConstants.Type type) {
-        OtpRequestResult otpRequestResult = checkIfRequestedBefore(user, ipAddress, userAgent, type);
-
-        if (!otpRequestResult.getNeedToSendNew()) {
-            return otpRequestResult;
-        }
-
-        String otp = generateOtp();
-
-        createNewOtp(user, ipAddress, userAgent, type, otp);
-
-        otpRequestResult.setOtp(otp);
-        return otpRequestResult;
+        return buildOtpRequestResponse(otpRequestResult);
     }
 
     private OtpRequestResult checkIfRequestedBefore(User user, String ipAddress, String userAgent, UserOtpVerificationConstants.Type type) {
@@ -157,8 +126,7 @@ public class UserOtpVerificationService {
             boolean isActive = userOtpVerification.getIsActive();
 
             // Check if OTP is expired (Deactivate it)
-            if (isActive && isExpired(userOtpVerification.getExpiryDate())) {
-                markAsExpired(userOtpVerification);
+            if (isActive && isExpired(user, userOtpVerification)) {
                 isActive = userOtpVerification.getIsActive();
             }
 
@@ -178,7 +146,7 @@ public class UserOtpVerificationService {
             }
 
             // Check if the max resend count is hit (3 resends max)
-            if (isOtpVerificationReachedMax(userOtpVerification.getResendCount())) {
+            if (isOtpVerificationReachedMax(type, userOtpVerification.getResendCount())) {
                 throw new ApplicationException(OTP_REQUEST_MAX);
             }
 
@@ -189,9 +157,33 @@ public class UserOtpVerificationService {
 
             otpRequestResult.setOtp(otp);
             otpRequestResult.setNeedToSendNew(false);
+            otpRequestResult.setMaxRequestLimit(type.getMaxRequest());
+            otpRequestResult.setRemainingRequestCount(type.getMaxRequest() - userOtpVerification.getResendCount());
+            otpRequestResult.setRetryAfterSeconds(type.getResendIntervalSeconds());
         }
 
         return otpRequestResult;
+    }
+
+    private void sendOtpEmail(User user, String otp, UserOtpVerificationConstants.Type type) {
+        switch (type) {
+            case LOGIN -> sendLoginOtpEmail(user, otp, type);
+            default -> throw new RuntimeException("OTP Email sending type is not configured");
+        }
+
+    }
+
+    public void validateOtp(User user, String otp, String ipAddress, String userAgent, UserOtpVerificationConstants.Type type) {
+        UserOtpVerification userOtpVerification = findTopByUserIdAndIpAddressAndUserAgentAndOtpTypeOrderByCreatedAtDesc(user.getId(), ipAddress, userAgent, type.getType());
+
+        basicValidation(user, userOtpVerification, ipAddress, userAgent);
+
+        if (!sha512Hex(otp).equals(userOtpVerification.getOtp())) {
+            log.info("Invalid otp userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
+            throw new ApplicationException(INVALID_REQUEST);
+        }
+
+        markAsVerified(userOtpVerification);
     }
 
     private void createNewOtp(User user, String ipAddress, String userAgent, UserOtpVerificationConstants.Type type, String otp) {
@@ -227,17 +219,55 @@ public class UserOtpVerificationService {
         save(userOtpVerification);
     }
 
+    private void basicValidation(User user, UserOtpVerification userOtpVerification, String ipAddress, String userAgent) {
+        if (userOtpVerification == null) {
+            log.info("Otp is not found userId={} , ipAddress={}, userAgent={}", user.getId(), ipAddress, userAgent);
+            throw new ApplicationException(INVALID_REQUEST);
+        }
+
+        if (isInactive(user,  userOtpVerification)) {
+            throw new ApplicationException(INVALID_REQUEST);
+        }
+
+        // Check if OTP is expired (Deactivate it)
+        if (isExpired(user, userOtpVerification)) {
+            throw new ApplicationException(INVALID_REQUEST);
+        }
+    }
+
     private void markAsExpired(UserOtpVerification userOtpVerification) {
         userOtpVerification.setIsActive(false);
         save(userOtpVerification);
     }
 
-    private boolean isOtpVerificationReachedMax(Integer resendCount) {
-        return resendCount >= 3;
+    private boolean isOtpVerificationReachedMax(UserOtpVerificationConstants.Type type, Integer resendCount) {
+        return resendCount >= type.getMaxRequest();
     }
 
-    private boolean isExpired(LocalDateTime expiryDate) {
-        return expiryDate.isBefore(nowDate());
+    private boolean isExpired(User user, UserOtpVerification userOtpVerification) {
+        if (!userOtpVerification.getExpiryDate().isBefore(nowDate())) {
+            return false;
+        }
+
+        log.info("Otp is expired userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
+        markAsExpired(userOtpVerification);
+        return true;
+    }
+
+    private boolean isInactive(User user, UserOtpVerification userOtpVerification) {
+        if (userOtpVerification.getIsActive()) {
+            return false;
+        }
+        log.info("Otp is inactive userId={} , userOtpVerificationId={}", user.getId(), userOtpVerification.getId());
+        return true;
+    }
+
+    private OtpRequestResponse buildOtpRequestResponse(OtpRequestResult otpRequestResult) {
+        return new OtpRequestResponse(
+                otpRequestResult.getRemainingRequestCount(),
+                otpRequestResult.getMaxRequestLimit(),
+                otpRequestResult.getRetryAfterSeconds()
+        );
     }
 
     private String generateOtp() {

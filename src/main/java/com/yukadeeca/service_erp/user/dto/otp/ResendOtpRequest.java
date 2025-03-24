@@ -1,4 +1,4 @@
-package com.yukadeeca.service_erp.user.dto;
+package com.yukadeeca.service_erp.user.dto.otp;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

@@ -17,11 +17,12 @@ public final class UserOtpVerificationConstants {
     @AllArgsConstructor
     @Getter
     public enum Type {
-        LOGIN("LOGIN", 15, 60, 5, UserLoginOtpVerification::builder);
+        LOGIN("LOGIN", 15, 60, 3, 5, UserLoginOtpVerification::builder);
 
         final String type;
         final Integer cooldownPeriodMinutes;
         final Integer resendIntervalSeconds;
+        final Integer maxRequest;
         final Integer otpValidityMinutes;
         final Supplier<EmailTemplateBuilder> emailTemplate;
 

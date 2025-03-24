@@ -1,6 +1,7 @@
 package com.yukadeeca.service_erp.common.exception;
 
 import com.yukadeeca.service_erp.common.constant.ErrorCode;
+import com.yukadeeca.service_erp.common.dto.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
